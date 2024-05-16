@@ -24,11 +24,11 @@ inputs:
   primary-cache-key:
     description: 'Set the primary cache key'
     required: false
-    default: "qodana-2023.3-${{ github.ref }}-${{ github.sha }}"
+    default: "qodana-2024.1-${{ github.ref }}-${{ github.sha }}"
   additional-cache-key:
     description: 'Set the additional cache key'
     required: false
-    default: "qodana-2023.3-${{ github.ref }}"
+    default: "qodana-2024.1-${{ github.ref }}"
   cache-default-branch-only:
     description: 'Upload cache for the default branch only'
     required: false
@@ -65,6 +65,11 @@ inputs:
     description: 'Commit message for the commit with quick-fixes. Not used if `push-fixes` is set to `none`'
     required: false
     default: "🤖 Apply quick-fixes by Qodana"
+  use-nightly:
+    description: 'Use unstable Qodana CLI nightly'
+    required: false
+    default: "false"
+    deprecationMessage: 'This option is for development purposes only. Do not use it in production.'
 runs:
   using: 'node20'
   main: 'scan/dist/index.js'

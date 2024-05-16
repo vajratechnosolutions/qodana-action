@@ -23,12 +23,14 @@ import {
   NONE,
   PULL_REQUEST,
   BRANCH,
-  isNativeMode
+  isNativeMode,
+  validateBranchName
 } from '../../common/qodana'
 import path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
 import {COMMIT_EMAIL, COMMIT_USER, prFixesBody} from './output'
+
 export const ANALYSIS_FINISHED_REACTION = '+1'
 export const ANALYSIS_STARTED_REACTION = 'eyes'
 const REACTIONS = [
@@ -67,9 +69,21 @@ export function getInputs(): Inputs {
     postComment: core.getBooleanInput('post-pr-comment'),
     githubToken: core.getInput('github-token'),
     pushFixes: core.getInput('push-fixes'),
-    commitMessage: core.getInput('commit-message')
+    commitMessage: core.getInput('commit-message'),
+    useNightly: core.getBooleanInput('use-nightly')
   }
 }
+
+function getPrSha(): string {
+  if (process.env.QODANA_PR_SHA) {
+    return process.env.QODANA_PR_SHA
+  }
+  if (github.context.payload.pull_request !== undefined) {
+    return github.context.payload.pull_request.base.sha
+  }
+  return ''
+}
+
 /**
  * Runs the qodana command with the given arguments.
  * @param inputs the action inputs.
@@ -82,9 +96,11 @@ export async function qodana(
 ): Promise<number> {
   if (args.length === 0) {
     args = getQodanaScanArgs(inputs.args, inputs.resultsDir, inputs.cacheDir)
-    if (inputs.prMode && github.context.payload.pull_request !== undefined) {
-      const pr = github.context.payload.pull_request
-      args.push('--commit', `CI${pr.base.sha}`)
+    if (inputs.prMode) {
+      const sha = getPrSha()
+      if (sha !== '') {
+        args.push('--commit', sha)
+      }
     }
   }
   return (
@@ -110,6 +126,7 @@ export async function pushQuickFixes(
   if (c.payload.pull_request?.head.ref !== undefined) {
     currentBranch = c.payload.pull_request.head.ref
   }
+  currentBranch = validateBranchName(currentBranch)
   await git(['config', 'user.name', COMMIT_USER])
   await git(['config', 'user.email', COMMIT_EMAIL])
   await git(['add', '.'])
@@ -139,17 +156,23 @@ export async function pushQuickFixes(
 /**
  * Prepares the agent for qodana scan: install Qodana CLI and pull the linter.
  * @param args qodana arguments
+ * @param useNightly whether to use a nightly version of Qodana CLI
  */
-export async function prepareAgent(args: string[]): Promise<void> {
+export async function prepareAgent(
+  args: string[],
+  useNightly = false
+): Promise<void> {
   const arch = getProcessArchName()
   const platform = getProcessPlatformName()
-  const expectedChecksum = getQodanaSha256(arch, platform)
-  const temp = await tc.downloadTool(getQodanaUrl(arch, platform))
-  const actualChecksum = sha256sum(temp)
-  if (expectedChecksum !== actualChecksum) {
-    core.setFailed(
-      getQodanaSha256MismatchMessage(expectedChecksum, actualChecksum)
-    )
+  const temp = await tc.downloadTool(getQodanaUrl(arch, platform, useNightly))
+  if (!useNightly) {
+    const expectedChecksum = getQodanaSha256(arch, platform)
+    const actualChecksum = sha256sum(temp)
+    if (expectedChecksum !== actualChecksum) {
+      core.setFailed(
+        getQodanaSha256MismatchMessage(expectedChecksum, actualChecksum)
+      )
+    }
   }
   let extractRoot
   if (process.platform === 'win32') {
@@ -157,7 +180,9 @@ export async function prepareAgent(args: string[]): Promise<void> {
   } else {
     extractRoot = await tc.extractTar(temp)
   }
-  core.addPath(await tc.cacheDir(extractRoot, EXECUTABLE, VERSION))
+  core.addPath(
+    await tc.cacheDir(extractRoot, EXECUTABLE, useNightly ? 'nightly' : VERSION)
+  )
   if (!isNativeMode(args)) {
     const exitCode = await qodana(getInputs(), getQodanaPullArgs(args))
     if (exitCode !== 0) {
@@ -183,7 +208,13 @@ export async function uploadArtifacts(
   }
   try {
     core.info('Uploading artifacts...')
-    const globber = await glob.create(`${resultsDir}/*`)
+    const locations = [
+      `${resultsDir}/*`,
+      `${resultsDir}/log/*`,
+      `${resultsDir}/report/*`,
+      `${resultsDir}/projectStructure/*`
+    ]
+    const globber = await glob.create(locations.join('\n'))
     const files = await globber.glob()
     await artifact.uploadArtifact(artifactName, files, path.dirname(resultsDir))
   } catch (error) {

@@ -8,9 +8,9 @@
   "category": "Utility",
   "author": "JetBrains",
   "version": {
-    "Major": 2023,
-    "Minor": 3,
-    "Patch": 2
+    "Major": 2024,
+    "Minor": 1,
+    "Patch": 5
   },
   "instanceNameFormat": "Qodana Scan",
   "inputs": [
@@ -61,6 +61,14 @@
       "defaultValue": "$(Agent.TempDirectory)/qodana/cache",
       "required": false,
       "helpMarkDown": "Directory to store Qodana caches"
+    },
+    {
+      "name": "useNightly",
+      "type": "boolean",
+      "label": "Use unstable Qodana CLI nightly",
+      "defaultValue": false,
+      "required": false,
+      "helpMarkDown": "This option is for development purposes only. Do not use it in production."
     }
   ],
   "execution": {

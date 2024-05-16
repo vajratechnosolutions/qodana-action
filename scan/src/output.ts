@@ -38,10 +38,10 @@ const SUMMARY_MISC = `Contact us at [qodana-support@jetbrains.com](mailto:qodana
   - Or via our issue tracker: https://jb.gg/qodana-issue
   - Or share your feedback: https://jb.gg/qodana-discussions`
 const VIEW_REPORT_OPTIONS = `To be able to view the detailed Qodana report, you can either:
-  1. Register at [Qodana Cloud](https://qodana.cloud/) and [configure the action](https://github.com/jetbrains/qodana-action#qodana-cloud)
-  2. Use [GitHub Code Scanning with Qodana](https://github.com/jetbrains/qodana-action#github-code-scanning)
-  3. Host [Qodana report at GitHub Pages](https://github.com/JetBrains/qodana-action/blob/3a8e25f5caad8d8b01c1435f1ef7b19fe8b039a0/README.md#github-pages)
-  4. Inspect and use \`qodana.sarif.json\` (see [the Qodana SARIF format](https://www.jetbrains.com/help/qodana/qodana-sarif-output.html#Report+structure) for details)
+  - Register at [Qodana Cloud](https://qodana.cloud/) and [configure the action](https://github.com/jetbrains/qodana-action#qodana-cloud)
+  - Use [GitHub Code Scanning with Qodana](https://github.com/jetbrains/qodana-action#github-code-scanning)
+  - Host [Qodana report at GitHub Pages](https://github.com/JetBrains/qodana-action/blob/3a8e25f5caad8d8b01c1435f1ef7b19fe8b039a0/README.md#github-pages)
+  - Inspect and use \`qodana.sarif.json\` (see [the Qodana SARIF format](https://www.jetbrains.com/help/qodana/qodana-sarif-output.html#Report+structure) for details)
 
 To get \`*.log\` files or any other Qodana artifacts, run the action with \`upload-result\` option set to \`true\`, 
 so that the action will upload the files as the job artifacts:
@@ -138,12 +138,14 @@ export async function publishOutput(
       COVERAGE_THRESHOLD
     )
     let licensesInfo = ''
+    let packages = 0
     const licensesJson = `${resultsDir}/projectStructure/${QODANA_LICENSES_JSON}`
     if (fs.existsSync(licensesJson)) {
       const licenses = JSON.parse(
         fs.readFileSync(licensesJson, {encoding: 'utf8'})
       )
       if (licenses.length > 0) {
+        packages = licenses.length
         licensesInfo = fs.readFileSync(
           `${resultsDir}/projectStructure/${QODANA_LICENSES_MD}`,
           {encoding: 'utf8'}
@@ -157,6 +159,7 @@ export async function publishOutput(
       toolName,
       annotations,
       coverageInfo,
+      packages,
       licensesInfo,
       reportUrl,
       isPrMode
@@ -222,6 +225,7 @@ function getRowsByLevel(annotations: Annotation[], level: string): string {
  * @param toolName The name of the tool to generate the summary from.
  * @param annotations The annotations to generate the summary from.
  * @param coverageInfo The coverage is a Markdown text to generate the summary from.
+ * @param packages The number of dependencies in the analyzed project.
  * @param licensesInfo The licenses a Markdown text to generate the summary from.
  * @param reportUrl The URL to the Qodana report.
  * @param prMode Whether the analysis was run in the pull request mode.
@@ -230,6 +234,7 @@ export function getSummary(
   toolName: string,
   annotations: Annotation[],
   coverageInfo: string,
+  packages: number,
   licensesInfo: string,
   reportUrl: string,
   prMode: boolean
@@ -237,7 +242,10 @@ export function getSummary(
   const contactBlock = wrapToToggleBlock('Contact Qodana team', SUMMARY_MISC)
   let licensesBlock = ''
   if (licensesInfo !== '') {
-    licensesBlock = wrapToToggleBlock('Dependencies licenses', licensesInfo)
+    licensesBlock = wrapToToggleBlock(
+      `Detected ${packages} ${getDepencencyPlural(packages)}`,
+      licensesInfo
+    )
   }
   let prModeBlock = ''
   if (prMode) {
@@ -306,6 +314,15 @@ export function getSummary(
  */
 export function getProblemPlural(count: number): string {
   return `new problem${count !== 1 ? 's' : ''}`
+}
+
+/**
+ * Generates a plural form of the word "dependency" depending on the given count.
+ * @param count A number representing the count of dependencies
+ * @returns A formatted string with the correct plural form of "dependency"
+ */
+export function getDepencencyPlural(count: number): string {
+  return `dependenc${count !== 1 ? 'ies' : 'y'}`
 }
 
 /*

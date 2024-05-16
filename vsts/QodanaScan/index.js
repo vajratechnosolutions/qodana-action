@@ -37,14 +37,14 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var version, checksum;
 var init_cli = __esm({
   "../common/cli.json"() {
-    version = "2023.3.2";
+    version = "2024.1.5";
     checksum = {
-      windows_x86_64: "50768fa57f0e6603d44dc2e505b59afd3ee3064740443443ab5c747a973d75d6",
-      linux_arm64: "61c87ad3f8f72de5cdb5ac78821f0cef9cffec12e36d62b1747d246b01031bf5",
-      darwin_arm64: "23383d46ea5f2c92719f4d31581e1672dde6f9dc52df00c87be603ed1181b6ab",
-      darwin_x86_64: "6e38b4ea3d59c5e517ce2b5c530fb373acccacff311fbfca283c293e2dfee51c",
-      windows_arm64: "eec404334deea68e6f0efffc12e6bd0ff516c1aa9bdd327bb4ef1e0b4d415bab",
-      linux_x86_64: "08641aed84e7cb9d422feabbaa60034322f3471d3ae7f5c7b04da0b766981886"
+      windows_x86_64: "cdb4bfb6e5fc5b37e14cc50fe9122847d008607fd0f27204340878bc15129e8a",
+      linux_arm64: "c8468d63f68db9ee21cb78ca53a583743748dc236472e7e903a2bed50ed5b1e6",
+      darwin_arm64: "3e6ac933d08d5e640ca89252808d661054f6b7c0d5749cb46f618165154fd809",
+      darwin_x86_64: "9ed82db050f950bbeb992310aabd6dfac0cd6e5b65724d6ff2afa30e28b890bf",
+      windows_arm64: "f435008eb63582744f21d0087c8f84442d911606d45fccb7bfd6ee9a8045ca28",
+      linux_x86_64: "6a2c10b77a275ebd379acc27281de6cbf90402aab7ca6e1cc76ad083b7f55e99"
     };
   }
 });
@@ -79,7 +79,8 @@ __export(qodana_exports, {
   getQodanaUrl: () => getQodanaUrl,
   isExecutionSuccessful: () => isExecutionSuccessful,
   isNativeMode: () => isNativeMode,
-  sha256sum: () => sha256sum
+  sha256sum: () => sha256sum,
+  validateBranchName: () => validateBranchName
 });
 function getQodanaSha256(arch, platform) {
   switch (`${platform}_${arch}`) {
@@ -104,7 +105,7 @@ function getProcessArchName() {
 function getProcessPlatformName() {
   return process.platform === "win32" ? "windows" : process.platform;
 }
-function getQodanaUrl(arch, platform) {
+function getQodanaUrl(arch, platform, nightly = false) {
   if (!SUPPORTED_PLATFORMS.includes(platform)) {
     throw new Error(`Unsupported platform: ${platform}`);
   }
@@ -112,7 +113,8 @@ function getQodanaUrl(arch, platform) {
     throw new Error(`Unsupported architecture: ${arch}`);
   }
   const archive = platform === "windows" ? "zip" : "tar.gz";
-  return `https://github.com/JetBrains/qodana-cli/releases/download/v${version}/qodana_${platform}_${arch}.${archive}`;
+  const cli_version = nightly ? "nightly" : `v${version}`;
+  return `https://github.com/JetBrains/qodana-cli/releases/download/${cli_version}/qodana_${platform}_${arch}.${archive}`;
 }
 function isExecutionSuccessful(exitCode) {
   return Object.values(QodanaExitCode).includes(exitCode);
@@ -139,6 +141,10 @@ function getQodanaPullArgs(args) {
   const project = extractArg("-i", "--project-dir", args);
   if (project) {
     pullArgs.push("-i", project);
+  }
+  const config = extractArg("--config", "--config", args);
+  if (config) {
+    pullArgs.push("--config", config);
   }
   return pullArgs;
 }
@@ -193,6 +199,15 @@ function sha256sum(file) {
 function getQodanaSha256MismatchMessage(expected, actual) {
   return `Downloaded Qodana CLI binary is corrupted. Expected SHA-256 checksum: ${expected}, actual checksum: ${actual}`;
 }
+function validateBranchName(branchName) {
+  const validBranchNameRegex = /^[a-zA-Z0-9/\-_.]+$/;
+  if (!validBranchNameRegex.test(branchName)) {
+    throw new Error(
+      `Invalid branch name: not allowed characters are used: ${branchName}`
+    );
+  }
+  return branchName;
+}
 var import_crypto, import_fs, SUPPORTED_PLATFORMS, SUPPORTED_ARCHS, FAIL_THRESHOLD_OUTPUT, QODANA_SARIF_NAME, QODANA_SHORT_SARIF_NAME, QODANA_REPORT_URL_NAME, QODANA_OPEN_IN_IDE_NAME, QODANA_LICENSES_MD, QODANA_LICENSES_JSON, EXECUTABLE, VERSION, COVERAGE_THRESHOLD, QodanaExitCode, NONE, BRANCH, PULL_REQUEST;
 var init_qodana = __esm({
   "../common/qodana.ts"() {
@@ -208,7 +223,7 @@ var init_qodana = __esm({
     QODANA_REPORT_URL_NAME = "qodana.cloud";
     QODANA_OPEN_IN_IDE_NAME = "open-in-ide.json";
     QODANA_LICENSES_MD = "thirdPartySoftwareList.md";
-    QODANA_LICENSES_JSON = "thirdPartySoftwareList.json";
+    QODANA_LICENSES_JSON = "third-party-libraries.json";
     EXECUTABLE = "qodana";
     VERSION = version;
     COVERAGE_THRESHOLD = 50;
@@ -4396,14 +4411,10 @@ var require_semver_compare = __commonJS({
       for (var i = 0; i < 3; i++) {
         var na = Number(pa[i]);
         var nb = Number(pb[i]);
-        if (na > nb)
-          return 1;
-        if (nb > na)
-          return -1;
-        if (!isNaN(na) && isNaN(nb))
-          return 1;
-        if (isNaN(na) && !isNaN(nb))
-          return -1;
+        if (na > nb) return 1;
+        if (nb > na) return -1;
+        if (!isNaN(na) && isNaN(nb)) return 1;
+        if (isNaN(na) && !isNaN(nb)) return -1;
       }
       return 0;
     };
@@ -4924,8 +4935,7 @@ var require_utils2 = __commonJS({
   "lib/utils.js"(exports2) {
     "use strict";
     var __createBinding2 = exports2 && exports2.__createBinding || (Object.create ? function(o, m, k, k2) {
-      if (k2 === void 0)
-        k2 = k;
+      if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m, k);
       if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
         desc = { enumerable: true, get: function() {
@@ -4934,8 +4944,7 @@ var require_utils2 = __commonJS({
       }
       Object.defineProperty(o, k2, desc);
     } : function(o, m, k, k2) {
-      if (k2 === void 0)
-        k2 = k;
+      if (k2 === void 0) k2 = k;
       o[k2] = m[k];
     });
     var __setModuleDefault2 = exports2 && exports2.__setModuleDefault || (Object.create ? function(o, v) {
@@ -4944,13 +4953,10 @@ var require_utils2 = __commonJS({
       o["default"] = v;
     });
     var __importStar2 = exports2 && exports2.__importStar || function(mod) {
-      if (mod && mod.__esModule)
-        return mod;
+      if (mod && mod.__esModule) return mod;
       var result = {};
       if (mod != null) {
-        for (var k in mod)
-          if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k))
-            __createBinding2(result, mod, k);
+        for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding2(result, mod, k);
       }
       __setModuleDefault2(result, mod);
       return result;
@@ -5002,6 +5008,7 @@ var require_utils2 = __commonJS({
         uploadResult: tl2.getBoolInput("uploadResult", false) || false,
         uploadSarif: tl2.getBoolInput("uploadSarif", false) || true,
         artifactName: tl2.getInput("artifactName", false) || "qodana-report",
+        useNightly: tl2.getBoolInput("useNightly", false) || false,
         // Not used by the Azure task
         postComment: false,
         additionalCacheKey: "",
@@ -5029,15 +5036,17 @@ var require_utils2 = __commonJS({
       });
     }
     exports2.qodana = qodana;
-    function prepareAgent(args) {
-      return __awaiter2(this, void 0, void 0, function* () {
+    function prepareAgent(args_1) {
+      return __awaiter2(this, arguments, void 0, function* (args, useNightly = false) {
         const arch = (0, qodana_12.getProcessArchName)();
         const platform = (0, qodana_12.getProcessPlatformName)();
-        const expectedChecksum = (0, qodana_12.getQodanaSha256)(arch, platform);
         const temp = yield tool.downloadTool((0, qodana_12.getQodanaUrl)(arch, platform));
-        const actualChecksum = (0, qodana_12.sha256sum)(temp);
-        if (expectedChecksum !== actualChecksum) {
-          setFailed((0, qodana_12.getQodanaSha256MismatchMessage)(expectedChecksum, actualChecksum));
+        if (!useNightly) {
+          const expectedChecksum = (0, qodana_12.getQodanaSha256)(arch, platform);
+          const actualChecksum = (0, qodana_12.sha256sum)(temp);
+          if (expectedChecksum !== actualChecksum) {
+            setFailed((0, qodana_12.getQodanaSha256MismatchMessage)(expectedChecksum, actualChecksum));
+          }
         }
         let extractRoot;
         if (process.platform === "win32") {
@@ -5045,7 +5054,7 @@ var require_utils2 = __commonJS({
         } else {
           extractRoot = yield tool.extractTar(temp);
         }
-        tool.prependPath(yield tool.cacheDir(extractRoot, qodana_12.EXECUTABLE, qodana_12.VERSION));
+        tool.prependPath(yield tool.cacheDir(extractRoot, qodana_12.EXECUTABLE, useNightly ? "nightly" : qodana_12.VERSION));
         if (!(0, qodana_12.isNativeMode)(args)) {
           const pull = yield qodana((0, qodana_12.getQodanaPullArgs)(args));
           if (pull !== 0) {
@@ -5092,8 +5101,7 @@ var require_utils2 = __commonJS({
 
 // lib/main.js
 var __createBinding = exports && exports.__createBinding || (Object.create ? function(o, m, k, k2) {
-  if (k2 === void 0)
-    k2 = k;
+  if (k2 === void 0) k2 = k;
   var desc = Object.getOwnPropertyDescriptor(m, k);
   if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
     desc = { enumerable: true, get: function() {
@@ -5102,8 +5110,7 @@ var __createBinding = exports && exports.__createBinding || (Object.create ? fun
   }
   Object.defineProperty(o, k2, desc);
 } : function(o, m, k, k2) {
-  if (k2 === void 0)
-    k2 = k;
+  if (k2 === void 0) k2 = k;
   o[k2] = m[k];
 });
 var __setModuleDefault = exports && exports.__setModuleDefault || (Object.create ? function(o, v) {
@@ -5112,13 +5119,10 @@ var __setModuleDefault = exports && exports.__setModuleDefault || (Object.create
   o["default"] = v;
 });
 var __importStar = exports && exports.__importStar || function(mod) {
-  if (mod && mod.__esModule)
-    return mod;
+  if (mod && mod.__esModule) return mod;
   var result = {};
   if (mod != null) {
-    for (var k in mod)
-      if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k))
-        __createBinding(result, mod, k);
+    for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
   }
   __setModuleDefault(result, mod);
   return result;
